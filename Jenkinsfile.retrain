@@ -1,0 +1,89 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Setup Environment') {
+            steps {
+                sh '''
+                    echo "Setting up virtual environment..."
+                    # Create and activate a virtual environment
+                    python3 -m venv mlipproj0
+                    . mlipproj0/bin/activate
+
+                    # Upgrade pip and setuptools
+                    pip install --upgrade pip setuptools wheel
+                    
+                    # Install numpy separately if needed to avoid build issues
+                    pip install numpy==1.26.0
+
+                    # Install dependencies from requirements.txt
+                    pip install -r requirements.txt --use-pep517 || {
+                        echo "requirements.txt not found, installing manually"
+                        pip install pandas scikit-learn pytest flask kafka-python-ng scikit-surprise prometheus_client prometheus-flask-exporter mlflow
+                    }
+                '''
+            }
+        }
+
+        stage('Get New Data') {
+            steps {
+                sh '''
+                    echo "Fetching new data from Kafka..."
+                    . mlipproj0/bin/activate  # Ensure the virtual environment is activated
+                    # Run the Kafka to CSV script to pull new data
+                    python3 src/data_processing/kafka_to_csv.py
+                '''
+            }
+        }
+
+        // stage('Run Pytest Tests') {
+        //     steps {
+        //         sh '''
+        //             echo "Running Pytest tests..."
+        //             . mlipproj0/bin/activate  # Ensure the virtual environment is activated
+
+        //             export PYTHONPATH='/var/lib/jenkins/workspace/PeriodicRetrain'
+
+        //             # Run the tests with pytest
+        //             pytest --maxfail=1 --disable-warnings || true
+        //         '''
+        //     }
+        // }
+
+        stage('Retrain Model') {
+            steps {
+                sh '''
+                    echo "Retraining the model..."
+                    . mlipproj0/bin/activate  # Ensure the virtual environment is activated
+                    # Retrain the model using the SVD model training script
+                    python3 src/models/svdmodel.py
+                '''
+            }
+        }
+
+        stage('Copy Model to VM') {
+                steps {
+                    sshagent(['2aeca50b-6ddf-4624-8d33-9b86c0db38fd']) {
+                        sh '''
+                            echo "Copying model to VM using SCP..."
+                            scp -o StrictHostKeyChecking=no /var/lib/jenkins/workspace/PeriodicRetrain/svd_latest.pkl team17@128.2.205.118:/home/team17/files/src/flask_app/model_versions
+                        '''
+                    }
+                }
+        }
+    }
+
+    post {
+        always {
+            echo "Cleaning up..."
+        }
+
+        success {
+            echo "Retraining and saving the model completed successfully!"
+        }
+
+        failure {
+            echo "There was an issue with retraining or saving the model. Please check the logs."
+        }
+    }
+}

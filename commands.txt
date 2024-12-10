@@ -1,0 +1,141 @@
+docker-compose up -d --build 
+docker-compose up 
+
+
+1. Building flask_app docker
+    - From root directory
+    - `docker build -f deployment/flask_app/Dockerfile -t flask-app:latest .`
+    - gcloud auth configure-docker us-docker.pkg.dev
+    - docker tag flask-app:latest us-docker.pkg.dev/ml-prod-437204/flask-prediction/flask-app:latest
+    - docker push us-docker.pkg.dev/ml-prod-437204/flask-prediction/flask-app:latest
+
+2. Kubernetes
+    - gcloud auth login                       
+    - gcloud config set project ml-prod-437204
+    - gcloud container clusters get-credentials flask-prediction-cluster --region us-central1
+    - kubectl get nodes
+    - gcloud container clusters list
+    - kubectl apply -f deployment.yaml
+    - kubectl apply -f service.yaml
+
+
+
+kubectl create namespace monitoring
+
+kubectl apply -f prometheus-configmap.yaml \
+-f prometheus-deployment.yaml \
+-f node-exporter-deployment.yaml \
+-f grafana-deployment.yaml \
+-f prometheus-service.yaml \
+-f grafana-service.yaml
+
+
+
+kubectl get pods -n monitoring
+kubectl get services -n monitoring
+kubectl delete pod <new-prometheus-pod-name> -n monitoring
+
+Grafana user pass:
+    - admin
+    - sj2309fjs
+
+
+
+
+Here’s the command list in plain text, formatted as a bullet list:
+
+- Start the container in detached mode and expose it on port 8082:
+  ```bash
+  docker run -d -p 8082:8082 --name flask-app sorooshdem/flask-app:latest
+  ```
+
+- Check running containers:
+  ```bash
+  docker ps
+  ```
+
+- Check all containers (including stopped ones):
+  ```bash
+  docker ps -a
+  ```
+
+- Remove a stopped container (if needed):
+  ```bash
+  docker rm flask-app
+  ```
+
+- Set the restart policy to `unless-stopped`:
+  ```bash
+  docker update --restart unless-stopped flask-app
+  ```
+
+- Verify the restart policy:
+  ```bash
+  docker inspect flask-app --format '{{.HostConfig.RestartPolicy}}'
+  ```
+
+- Check which process is using port 8082 (if there's a conflict):
+  ```bash
+  sudo lsof -i :8082
+  ```
+
+- Search Nginx configurations for `listen 8082`:
+  ```bash
+  grep -R "listen 8082" /etc/nginx/
+  ```
+
+- Reload Nginx after configuration changes:
+  ```bash
+  sudo systemctl reload nginx
+  ```
+
+- Stop the container:
+  ```bash
+  docker stop flask-app
+  ```
+
+- Restart the container:
+  ```bash
+  docker start flask-app
+  ```
+
+- Remove the container:
+  ```bash
+  docker rm flask-app
+  ```
+
+- Test the app locally:
+  ```bash
+  curl http://localhost:8082
+  ```
+
+- Test the app externally (replace `<VM_IP>` with your VM’s public IP):
+  ```bash
+  curl http://<VM_IP>:8082
+  ``` 
+
+Running docker compose:
+  - docker-compose up --build -d
+
+Only rebuild and restart 1 service:
+- docker-compose up --build -d <service_name>
+
+
+
+
+
+
+
+Uploading:
+- scp Archive.zip sorooshd@128.2.205.118:/home/sorooshd/
+
+SSH:
+- ssh sorooshd@128.2.205.118
+
+Unzip:
+- unzip Archive.zip -d files
+
+Run kafka stream:
+- ssh -o ServerAliveInterval=60 -L 0.0.0.0:9092:localhost:9092 tunnel@128.2.204.215 -NTf
+- password: mlip-kafka
+
